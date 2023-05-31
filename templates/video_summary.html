@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="form-group">
+    <label for="youtubeURL">YouTube Video URL:</label>
+    <input type="text" class="form-control" id="youtubeURL">
+    <button id="submitURL" class="btn btn-primary mt-2">Submit</button>
+  </div>
+
+  <div id="youtubeEmbed" class="mt-4" style="display: none;">
+    <div class="spinner-border text-primary" role="status" id="spinner" style="display: none;">
+        <span class="sr-only">Loading...</span>
+    </div>
+    <!-- Embedded video will appear here -->
+  </div>
+
+  <div id="videoSummary" class="mt-4" style="display: none;">
+    <label for="summaryArea">Video Summary:</label>
+    <textarea class="form-control" id="summaryArea" rows="8" readonly></textarea>
+  </div>
+</div>
+<script>
+var video_id = null;
+
+document.getElementById('submitURL').addEventListener('click', async () => {
+    var videoURL = document.getElementById('youtubeURL').value.trim();
+
+    if (videoURL.length === 0) return;
+
+    video_id = videoURL.split('v=')[1];
+
+    document.getElementById('youtubeEmbed').style.display = 'block';  // show the youtubeEmbed div
+    document.getElementById('spinner').style.display = 'block';  // show spinner
+
+    try {
+        const response = await fetch('/process_video', {
+            method: 'POST',
+            body: JSON.stringify({ 'video_url': videoURL }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        document.getElementById('spinner').style.display = 'none';  // hide spinner
+
+        if (response.ok) {
+            const data = await response.json();
+            const embedUrl = data.video_url.replace("youtu.be", "youtube.com/embed");
+            document.getElementById('youtubeEmbed').innerHTML = `<iframe width="560" height="315" src="${embedUrl}" frameborder="0" allowfullscreen></iframe>`;
+            fetchSummary();
+        } else {
+            alert('Error processing video URL.');
+            document.getElementById('youtubeEmbed').style.display = 'none';  // hide the youtubeEmbed div if error
+        }
+    } catch (error) {
+        document.getElementById('spinner').style.display = 'none';  // hide spinner
+        document.getElementById('youtubeEmbed').style.display = 'none';  // hide the youtubeEmbed div if error
+        alert('Error connecting to the server.');
+    }
+});
+
+async function fetchSummary() {
+    try {
+        const response = await fetch('/summarize', {
+            method: 'POST',
+            body: JSON.stringify({ 'video_url': document.getElementById('youtubeURL').value.trim(), 'video_id': video_id }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('videoSummary').style.display = 'block';
+            document.getElementById('summaryArea').textContent = data.summary;
+        } else {
+            alert('Error getting video summary.');
+        }
+    } catch (error) {
+        alert('Error connecting to the server.');
+    }
+}
+
+</script>
+{% endblock %}
